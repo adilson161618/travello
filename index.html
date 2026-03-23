@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="TravelLog"/>
+<meta name="application-name" content="TravelLog"/>
+<meta name="theme-color" content="#1D9E75"/>
+<meta name="description" content="Rastreador de viagens com GPS, mapa e controle de gastos"/>
+<link rel="manifest" id="manifest-link"/>
+<link rel="apple-touch-icon" id="apple-icon"/>
+<title>TravelLog</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;}
+#shell{max-width:430px;margin:0 auto;background:#fff;min-height:100vh;display:flex;flex-direction:column;box-shadow:0 0 20px rgba(0,0,0,0.08);}
+#topbar{padding:14px 16px 10px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;background:#fff;}
+#tripname{font-size:16px;font-weight:600;color:#111;}
+#tripkm{font-size:12px;color:#888;margin-top:2px;}
+#total-badge{background:#E1F5EE;color:#085041;font-size:13px;font-weight:600;padding:5px 12px;border-radius:20px;white-space:nowrap;}
+#nav{display:flex;border-bottom:1px solid #eee;background:#fff;}
+.ntab{flex:1;padding:10px 4px;font-size:13px;text-align:center;cursor:pointer;color:#888;border:none;background:none;border-bottom:2px solid transparent;font-family:inherit;}
+.ntab.active{color:#111;border-bottom-color:#1D9E75;font-weight:600;}
+.screen{display:none;flex:1;overflow-y:auto;}.screen.active{display:block;}
+#mapwrap{position:relative;height:67vh;min-height:300px;}
+#leafmap{width:100%;height:100%;}
+#gps-overlay{position:absolute;bottom:8px;left:8px;z-index:1000;background:rgba(255,255,255,0.92);border:1px solid #ddd;border-radius:8px;padding:4px 10px;font-size:10px;color:#666;font-family:monospace;pointer-events:none;}
+#statusbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#f9f9f9;border-bottom:1px solid #eee;}
+#recbadge{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0;}
+#statustext{font-size:12px;color:#666;flex:1;}
+#actions{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid #eee;background:#fff;}
+.abtn{flex:1;padding:10px 6px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #ddd;background:#fff;color:#111;font-family:inherit;}
+.abtn.primary{background:#1D9E75;color:#fff;border-color:#1D9E75;}
+.abtn.primary:active{background:#0F6E56;}
+.abtn.danger{background:#fff5f5;color:#A32D2D;border-color:#fcc;}
+.abtn.new{background:#378ADD;color:#fff;border-color:#378ADD;}
+.abtn:disabled{opacity:0.4;cursor:not-allowed;}
+#install-bar{display:none;background:#1D9E75;color:#fff;padding:10px 16px;font-size:13px;align-items:center;justify-content:space-between;gap:10px;}
+#install-bar.show{display:flex;}
+#install-btn{background:#fff;color:#1D9E75;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+#install-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;}
+#tl-wrap{padding:14px 16px;}
+#tl-label{font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;}
+.tl-row{display:flex;gap:10px;padding-bottom:14px;}
+.tl-spine{display:flex;flex-direction:column;align-items:center;}
+.dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.dot.start{background:#378ADD;}
+.tl-vline{width:2px;flex:1;background:#eee;margin-top:4px;}
+.tl-place{font-size:14px;font-weight:600;color:#111;}
+.tl-meta{font-size:11px;color:#888;margin-top:2px;}
+.cat-pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;margin-left:4px;font-weight:600;}
+.tl-note{font-size:12px;color:#666;margin-top:5px;padding:6px 10px;background:#f7f7f7;border-left:2px solid #1D9E75;border-radius:0 8px 8px 0;}
+#gastos-wrap{padding:14px 16px;}
+#filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
+.fchip{font-size:11px;padding:5px 11px;border-radius:20px;cursor:pointer;border:1px solid #ddd;background:#f5f5f5;color:#666;font-weight:600;}
+.fchip.on{color:#085041;background:#E1F5EE;border-color:#5DCAA5;}
+#totals-box{background:#f7f7f7;border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid #eee;}
+#grand-total-label{font-size:11px;color:#888;margin-bottom:4px;}
+#grand-total{font-size:28px;font-weight:700;color:#111;}
+#cat-rows{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
+.cat-row{display:flex;align-items:center;gap:10px;}
+.cat-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.cat-info{flex:1;}.cat-name{font-size:12px;color:#666;}.cat-count{font-size:10px;color:#aaa;}.cat-val{font-size:13px;font-weight:600;color:#111;}
+.cat-bar-wrap{height:3px;background:#e5e5e5;border-radius:2px;margin-top:3px;}
+.cat-bar{height:3px;border-radius:2px;transition:width 0.4s;}
+#detail-list{display:flex;flex-direction:column;gap:10px;}
+.detail-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 14px;}
+.dc-top{display:flex;align-items:center;justify-content:space-between;}
+.dc-place{font-size:13px;font-weight:600;color:#111;}.dc-val{font-size:13px;font-weight:600;color:#111;}
+.dc-meta{font-size:11px;color:#888;margin-top:3px;}
+.dc-note{font-size:11px;color:#666;margin-top:6px;padding:5px 10px;background:#f7f7f7;border-radius:8px;}
+#hist-wrap{padding:14px 16px;}
+#hist-label{font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;}
+.hist-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer;}
+.hist-name{font-size:14px;font-weight:600;color:#111;}.hist-meta{font-size:11px;color:#888;margin-top:3px;}
+.hist-badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.hist-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:#f0f0f0;color:#666;font-weight:600;}
+.hist-empty{text-align:center;padding:32px 0;font-size:13px;color:#aaa;}
+.back-btn{background:none;border:1px solid #ddd;border-radius:8px;padding:6px 12px;font-size:13px;color:#666;cursor:pointer;font-family:inherit;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:flex-end;justify-content:center;}
+.overlay.open{display:flex;}
+.modal-sheet{background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 32px;width:100%;max-width:430px;max-height:90vh;overflow-y:auto;}
+.modal-sheet h3{font-size:15px;font-weight:700;color:#111;margin-bottom:14px;}
+#gps-card{border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:14px;background:#fafafa;}
+#gps-searching{display:flex;align-items:center;gap:10px;}
+#gps-spinner{width:18px;height:18px;border:2px solid #eee;border-top-color:#1D9E75;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#gps-search-text{font-size:13px;color:#666;}
+#gps-result{display:none;}
+#gps-result-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+#gps-cat-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+#gps-place-name{font-size:14px;font-weight:700;color:#111;}
+#gps-place-addr{font-size:11px;color:#888;margin-top:2px;}
+#gps-coords{font-size:10px;color:#aaa;font-family:monospace;margin-top:6px;}
+#gps-change{font-size:12px;color:#1D9E75;cursor:pointer;margin-top:6px;display:inline-block;font-weight:600;}
+#gps-error{display:none;font-size:12px;color:#A32D2D;background:#fff5f5;border-radius:8px;padding:8px 12px;margin-top:8px;}
+#override-toggle{font-size:12px;color:#1D9E75;cursor:pointer;display:block;margin-bottom:10px;font-weight:600;}
+#override-fields{display:none;margin-bottom:12px;}
+.ml{font-size:12px;color:#666;margin-bottom:5px;display:block;font-weight:500;}
+.mi{width:100%;margin-bottom:12px;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:14px;background:#fff;color:#111;font-family:inherit;}
+.mi:focus{outline:none;border-color:#1D9E75;}
+textarea.mi{height:64px;resize:none;line-height:1.5;}
+#cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.copt{padding:10px 4px;border-radius:10px;border:1px solid #eee;font-size:11px;text-align:center;cursor:pointer;color:#666;background:#fafafa;font-weight:500;}
+.copt.sel{border-color:#1D9E75;background:#E1F5EE;color:#085041;font-weight:700;}
+.mbtns{display:flex;gap:10px;margin-top:6px;}
+.mbtn{flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #ddd;background:#fff;color:#888;font-family:inherit;}
+.mbtn.save{background:#1D9E75;color:#fff;border-color:#1D9E75;}
+#bg-warning{background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;margin:10px 16px;font-size:12px;color:#795548;display:none;}
+</style>
+</head>
+<body>
+<div id="shell">
+  <div id="install-bar">
+    <span>📲 Instale o TravelLog na sua tela inicial!</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="install-btn" onclick="installPWA()">Instalar</button>
+      <button id="install-close" onclick="document.getElementById('install-bar').classList.remove('show')">✕</button>
+    </div>
+  </div>
+  <div id="topbar">
+    <div><div id="tripname">TravelLog</div><div id="tripkm">Aguardando GPS...</div></div>
+    <div id="total-badge">R$ 0,00</div>
+  </div>
+  <div id="nav">
+    <button class="ntab active" onclick="showScreen('mapa')">Mapa</button>
+    <button class="ntab" onclick="showScreen('timeline')">Rota</button>
+    <button class="ntab" onclick="showScreen('gastos')">Gastos</button>
+    <button class="ntab" onclick="showScreen('historico')">Viagens</button>
+  </div>
+  <div id="screen-mapa" class="screen active">
+    <div id="mapwrap"><div id="leafmap"></div><div id="gps-overlay">Aguardando GPS...</div></div>
+    <div id="bg-warning">⚠️ Mantenha o app aberto para continuar gravando a rota.</div>
+    <div id="statusbar"><div id="recbadge"></div><div id="statustext">Solicitando localização...</div></div>
+    <div id="actions">
+      <button class="abtn primary" id="markbtn" onclick="openModal()" disabled>+ Marcar ponto</button>
+      <button class="abtn" onclick="pauseTrip()" id="pausebtn" disabled>Pausar</button>
+      <button class="abtn danger" onclick="endTrip()" id="endbtn" disabled>Encerrar</button>
+    </div>
+  </div>
+  <div id="screen-timeline" class="screen">
+    <div id="tl-wrap">
+      <div id="tl-label">Pontos da viagem atual</div>
+      <div id="tl-list">
+        <div class="tl-row">
+          <div class="tl-spine"><div class="dot start"></div><div class="tl-vline"></div></div>
+          <div><div class="tl-place">Partida</div><div class="tl-meta" id="start-coords">Aguardando GPS...</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="screen-gastos" class="screen">
+    <div id="gastos-wrap">
+      <div id="filter-row"></div>
+      <div id="totals-box">
+        <div id="grand-total-label">Total selecionado</div>
+        <div id="grand-total">R$ 0,00</div>
+        <div id="cat-rows"></div>
+      </div>
+      <div id="detail-list"><div style="text-align:center;padding:32px 0;font-size:13px;color:#aaa;">Nenhum ponto marcado ainda.</div></div>
+    </div>
+  </div>
+  <div id="screen-historico" class="screen">
+    <div id="hist-wrap">
+      <div id="hist-label">Viagens salvas</div>
+      <div id="hist-list"></div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="modal-overlay">
+  <div class="modal-sheet">
+    <h3>Marcar ponto</h3>
+    <div id="gps-card">
+      <div id="gps-searching"><div id="gps-spinner"></div><div id="gps-search-text">Identificando local pelo GPS...</div></div>
+      <div id="gps-result">
+        <div id="gps-result-top"><div id="gps-cat-icon"></div><div><div id="gps-place-name"></div><div id="gps-place-addr"></div></div></div>
+        <div id="gps-coords"></div>
+        <span id="gps-change" onclick="doReverseGeo()">Atualizar localização</span>
+      </div>
+      <div id="gps-error">Não foi possível identificar. Edite manualmente abaixo.</div>
+    </div>
+    <span id="override-toggle" onclick="toggleOverride()">Editar nome ou categoria manualmente</span>
+    <div id="override-fields">
+      <label class="ml">Nome do local</label>
+      <input class="mi" id="m-place" placeholder="Ex: Posto BR km 142"/>
+      <label class="ml">Categoria</label>
+      <div id="cat-grid"></div>
+    </div>
+    <label class="ml">Valor gasto (R$) — opcional</label>
+    <input class="mi" id="m-val" type="number" placeholder="0,00" min="0" step="0.01"/>
+    <label class="ml">Anotação</label>
+    <textarea class="mi" id="m-note" placeholder="Observação opcional..."></textarea>
+    <div class="mbtns">
+      <button class="mbtn" onclick="closeModal()">Cancelar</button>
+      <button class="mbtn save" onclick="savePoint()">Salvar ponto</button>
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const CATS=[
+  {id:'pedagio',    label:'Pedágio',     icon:'🚧',bg:'#FAEEDA',color:'#633806'},
+  {id:'posto',      label:'Posto',       icon:'⛽',bg:'#E6F1FB',color:'#0C447C'},
+  {id:'restaurante',label:'Restaurante', icon:'🍽',bg:'#FBEAF0',color:'#72243E'},
+  {id:'borracharia',label:'Borracharia', icon:'🔧',bg:'#F1EFE8',color:'#444441'},
+  {id:'hospedagem', label:'Hospedagem',  icon:'🏨',bg:'#EEEDFE',color:'#3C3489'},
+  {id:'outros',     label:'Outros',      icon:'📌',bg:'#EAF3DE',color:'#27500A'},
+];
+const OSM_TAGS={toll_booth:'pedagio',fuel:'posto',restaurant:'restaurante',fast_food:'restaurante',cafe:'restaurante',bar:'restaurante',tyre:'borracharia',car_repair:'borracharia',hotel:'hospedagem',hostel:'hospedagem',motel:'hospedagem',guest_house:'hospedagem'};
+
+let map=null,gpsMarker=null,routeLine=null,routeCoords=[];
+let points=[],paused=false,ended=false,watching=false;
+let currentPos=null,currentGPS=null,selModal=null,overrideOpen=false;
+let watchId=null,totalDist=0,lastPos=null,tripStart=null;
+let deferredPrompt=null;
+window._selCats=new Set(CATS.map(c=>c.id));
+
+function fmt(v){return'R$ '+v.toFixed(2).replace('.',',');}
+function haverDist(a,b){
+  const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180;
+  const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredPrompt=e;
+  document.getElementById('install-bar').classList.add('show');
+});
+window.addEventListener('appinstalled',()=>{
+  document.getElementById('install-bar').classList.remove('show');
+});
+function installPWA(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-bar').classList.remove('show');});
+}
+
+function generateManifest(){
+  const icon=generateIcon();
+  const manifest={name:'TravelLog',short_name:'TravelLog',description:'Rastreador de viagens com GPS e controle de gastos',start_url:'.',display:'standalone',background_color:'#ffffff',theme_color:'#1D9E75',orientation:'portrait',icons:[{src:icon,sizes:'192x192',type:'image/png'},{src:icon,sizes:'512x512',type:'image/png'}]};
+  const blob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  document.getElementById('manifest-link').href=url;
+  document.getElementById('apple-icon').href=icon;
+}
+
+function generateIcon(){
+  const c=document.createElement('canvas'); c.width=192; c.height=192;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#1D9E75'; ctx.beginPath();
+  ctx.roundRect(0,0,192,192,32); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 100px serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🗺',96,96);
+  return c.toDataURL('image/png');
+}
+
+function registerSW(){
+  if(!('serviceWorker' in navigator)) return;
+  const swCode=`
+const CACHE='travellog-v1';
+const ASSETS=['https://unpkg.com/leaflet@1.9.4/dist/leaflet.css','https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
+self.addEventListener('fetch',e=>{
+  if(e.request.url.includes('tile.openstreetmap.org')){
+    e.respondWith(caches.open(CACHE).then(c=>c.match(e.request).then(r=>r||fetch(e.request).then(res=>{c.put(e.request,res.clone());return res;}))));
+  }
+});`;
+  const blob=new Blob([swCode],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(()=>{});
+}
+
+function saveToStorage(){
+  const state={points,routeCoords,totalDist,tripStart,ended};
+  try{localStorage.setItem('tl_current',JSON.stringify(state));}catch(e){}
+}
+function loadFromStorage(){
+  try{
+    const s=localStorage.getItem('tl_current');
+    if(!s) return false;
+    const state=JSON.parse(s);
+    if(state.ended) return false;
+    points=state.points||[]; routeCoords=state.routeCoords||[];
+    totalDist=state.totalDist||0; tripStart=state.tripStart||null;
+    return true;
+  }catch(e){return false;}
+}
+function getSavedTrips(){try{return JSON.parse(localStorage.getItem('tl_trips')||'[]');}catch(e){return[];}}
+function saveTripToHistory(trip){
+  const trips=getSavedTrips(); trips.unshift(trip);
+  try{localStorage.setItem('tl_trips',JSON.stringify(trips));}catch(e){}
+}
+
+function initLeaflet(lat,lon){
+  if(map) return;
+  map=L.map('leafmap',{zoomControl:true,attributionControl:true}).setView([lat,lon],17);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  const icon=L.divIcon({html:'<div style="width:16px;height:16px;background:#1D9E75;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(29,158,117,0.25);"></div>',iconSize:[16,16],iconAnchor:[8,8],className:''});
+  gpsMarker=L.marker([lat,lon],{icon,zIndexOffset:1000}).addTo(map);
+  routeLine=L.polyline(routeCoords.length?routeCoords:[],{color:'#1D9E75',weight:4,opacity:0.9}).addTo(map);
+  points.forEach(p=>{if(p.lat&&p.lon) addPinToMap(p.lat,p.lon,p.cat);});
+}
+function updateLeaflet(lat,lon){
+  if(!map) return;
+  gpsMarker.setLatLng([lat,lon]);
+  routeCoords.push([lat,lon]);
+  routeLine.setLatLngs(routeCoords);
+  map.panTo([lat,lon],{animate:true,duration:0.6});
+  document.getElementById('gps-overlay').textContent=lat.toFixed(5)+', '+lon.toFixed(5);
+}
+function addPinToMap(lat,lon,cat){
+  const c=CATS.find(x=>x.id===cat)||CATS[5];
+  const icon=L.divIcon({html:`<div style="width:32px;height:32px;background:${c.bg};border:2px solid ${c.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">${c.icon}</div>`,iconSize:[32,32],iconAnchor:[16,16],className:''});
+  L.marker([lat,lon],{icon}).addTo(map);
+}
+
+function onGPSSuccess(pos){
+  const lat=pos.coords.latitude,lon=pos.coords.longitude;
+  currentPos={lat,lon};
+  if(!watching){
+    watching=true;
+    if(!tripStart) tripStart=Date.now();
+    initLeaflet(lat,lon);
+    document.getElementById('statustext').textContent='GPS ativo — gravando rota';
+    document.getElementById('recbadge').style.background='#E24B4A';
+    document.getElementById('markbtn').disabled=false;
+    document.getElementById('pausebtn').disabled=false;
+    document.getElementById('endbtn').disabled=false;
+    document.getElementById('start-coords').textContent=lat.toFixed(5)+', '+lon.toFixed(5);
+    if(points.length>0) restoreTimeline();
+  }
+  if(!paused&&!ended){
+    if(lastPos) totalDist+=haverDist(lastPos,{lat,lon});
+    lastPos={lat,lon};
+    updateLeaflet(lat,lon);
+    document.getElementById('tripkm').textContent=points.length+' ponto'+(points.length!==1?'s':'')+' · '+(totalDist/1000).toFixed(2)+' km';
+    saveToStorage();
+  }
+}
+function onGPSError(err){
+  const msgs={1:'Permissão negada. Habilite o GPS.',2:'GPS indisponível.',3:'Tempo esgotado.'};
+  document.getElementById('statustext').textContent=msgs[err.code]||'Erro de GPS.';
+}
+function pauseTrip(){
+  paused=!paused;
+  document.getElementById('pausebtn').textContent=paused?'Retomar':'Pausar';
+  document.getElementById('statustext').textContent=paused?'Gravação pausada':'GPS ativo — gravando rota';
+  document.getElementById('recbadge').style.background=paused?'#ccc':'#E24B4A';
+}
+function endTrip(){
+  if(!confirm('Encerrar e salvar esta viagem?')) return;
+  ended=true;
+  if(watchId) navigator.geolocation.clearWatch(watchId);
+  document.getElementById('statustext').textContent='Viagem salva!';
+  document.getElementById('recbadge').style.background='#378ADD';
+  document.getElementById('markbtn').disabled=true;
+  document.getElementById('pausebtn').disabled=true;
+  document.getElementById('endbtn').disabled=true;
+  const grand=points.reduce((s,x)=>s+(x.val||0),0);
+  saveTripToHistory({id:Date.now(),date:tripStart||Date.now(),km:(totalDist/1000).toFixed(2),points:[...points],routeCoords:[...routeCoords],total:grand});
+  try{localStorage.removeItem('tl_current');}catch(e){}
+  document.getElementById('endbtn').textContent='Nova viagem';
+  document.getElementById('endbtn').className='abtn new';
+  document.getElementById('endbtn').disabled=false;
+  document.getElementById('endbtn').onclick=newTrip;
+  document.getElementById('tripname').textContent='Viagem salva ✓';
+}
+function newTrip(){
+  points=[];routeCoords=[];totalDist=0;lastPos=null;
+  tripStart=Date.now();paused=false;ended=false;watching=false;
+  if(watchId) navigator.geolocation.clearWatch(watchId);
+  if(map){map.remove();map=null;gpsMarker=null;routeLine=null;}
+  document.getElementById('leafmap').innerHTML='';
+  document.getElementById('tl-list').innerHTML=`<div class="tl-row"><div class="tl-spine"><div class="dot start"></div><div class="tl-vline"></div></div><div><div class="tl-place">Partida</div><div class="tl-meta" id="start-coords">Aguardando GPS...</div></div></div>`;
+  document.getElementById('tripname').textContent='TravelLog';
+  document.getElementById('tripkm').textContent='Aguardando GPS...';
+  document.getElementById('total-badge').textContent='R$ 0,00';
+  document.getElementById('statustext').textContent='Solicitando localização...';
+  document.getElementById('recbadge').style.background='#ccc';
+  document.getElementById('markbtn').disabled=true;
+  document.getElementById('pausebtn').disabled=true;
+  document.getElementById('pausebtn').textContent='Pausar';
+  document.getElementById('endbtn').textContent='Encerrar';
+  document.getElementById('endbtn').className='abtn danger';
+  document.getElementById('endbtn').disabled=true;
+  document.getElementById('endbtn').onclick=endTrip;
+  window._selCats=new Set(CATS.map(c=>c.id));
+  watchId=navigator.geolocation.watchPosition(onGPSSuccess,onGPSError,{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+  showScreen('mapa');
+}
+function restoreTimeline(){
+  const list=document.getElementById('tl-list');
+  points.forEach(p=>{
+    const cat=catFor(p.cat);
+    const row=document.createElement('div'); row.className='tl-row';
+    row.innerHTML=buildTlRowHtml(p,cat);
+    list.appendChild(row);
+  });
+  const grand=points.reduce((s,x)=>s+(x.val||0),0);
+  document.getElementById('total-badge').textContent=fmt(grand);
+}
+function buildTlRowHtml(p,cat){
+  return`<div class="tl-spine"><div class="dot" style="background:${cat.color};"></div><div class="tl-vline"></div></div>
+    <div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <div class="tl-place">${p.place}</div>
+      <span class="cat-pill" style="background:${cat.bg};color:${cat.color};">${cat.icon} ${cat.label}</span>
+      ${p.val?`<span style="font-size:12px;font-weight:700;color:#111;">${fmt(p.val)}</span>`:''}
+    </div>
+    <div class="tl-meta">${p.addr||''} · ${p.dist} km</div>
+    ${p.coords?`<div style="font-size:10px;color:#aaa;font-family:monospace;margin-top:2px;">${p.coords}</div>`:''}
+    ${p.note?`<div class="tl-note">${p.note}</div>`:''}
+    </div>`;
+}
+async function doReverseGeo(){
+  if(!currentPos) return;
+  document.getElementById('gps-result').style.display='none';
+  document.getElementById('gps-error').style.display='none';
+  document.getElementById('gps-searching').style.display='flex';
+  const{lat,lon}=currentPos;
+  try{
+    const res=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=18&addressdetails=1`,{headers:{'Accept-Language':'pt-BR','User-Agent':'TravelLog/1.0'}});
+    const data=await res.json();
+    const name=data.name||data.address?.road||data.display_name.split(',')[0];
+    const addr=[data.address?.road,data.address?.suburb,data.address?.city].filter(Boolean).join(', ');
+    const tag=data.type||data.class||'';
+    const cat=OSM_TAGS[tag]||'outros';
+    currentGPS={name,addr:addr||data.display_name.slice(0,70),lat,lon,cat};
+    selModal=cat; showGPSResult(currentGPS); buildCatGrid();
+  }catch(e){
+    document.getElementById('gps-searching').style.display='none';
+    document.getElementById('gps-error').style.display='block';
+    currentGPS={name:'Local atual',addr:lat.toFixed(5)+', '+lon.toFixed(5),lat,lon,cat:'outros'};
+    selModal='outros'; buildCatGrid();
+  }
+}
+function showGPSResult(p){
+  const cat=CATS.find(c=>c.id===p.cat)||CATS[5];
+  document.getElementById('gps-searching').style.display='none';
+  document.getElementById('gps-result').style.display='block';
+  const ico=document.getElementById('gps-cat-icon');
+  ico.style.background=cat.bg; ico.textContent=cat.icon;
+  document.getElementById('gps-place-name').textContent=p.name;
+  document.getElementById('gps-place-name').style.cssText='font-size:14px;font-weight:700;color:#111;';
+  document.getElementById('gps-place-addr').textContent=p.addr;
+  document.getElementById('gps-place-addr').style.cssText='font-size:11px;color:#888;margin-top:2px;';
+  document.getElementById('gps-coords').textContent=p.lat.toFixed(5)+', '+p.lon.toFixed(5);
+}
+function openModal(){
+  if(ended) return;
+  overrideOpen=false;
+  document.getElementById('override-fields').style.display='none';
+  document.getElementById('override-toggle').textContent='Editar nome ou categoria manualmente';
+  document.getElementById('gps-error').style.display='none';
+  document.getElementById('gps-result').style.display='none';
+  document.getElementById('gps-searching').style.display='flex';
+  document.getElementById('m-val').value='';
+  document.getElementById('m-note').value='';
+  document.getElementById('m-place').value='';
+  selModal=null; buildCatGrid();
+  document.getElementById('modal-overlay').classList.add('open');
+  doReverseGeo();
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function toggleOverride(){
+  overrideOpen=!overrideOpen;
+  document.getElementById('override-fields').style.display=overrideOpen?'block':'none';
+  document.getElementById('override-toggle').textContent=overrideOpen?'Usar identificação automática':'Editar nome ou categoria manualmente';
+  if(overrideOpen&&currentGPS) document.getElementById('m-place').value=currentGPS.name;
+}
+function buildCatGrid(){
+  const g=document.getElementById('cat-grid'); g.innerHTML='';
+  CATS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='copt'+(selModal===c.id?' sel':'');
+    d.innerHTML=`<div style="font-size:20px;margin-bottom:3px;">${c.icon}</div>${c.label}`;
+    d.onclick=()=>{selModal=c.id;buildCatGrid();};
+    g.appendChild(d);
+  });
+}
+function savePoint(){
+  const name=overrideOpen&&document.getElementById('m-place').value.trim()
+    ?document.getElementById('m-place').value.trim()
+    :(currentGPS?currentGPS.name:'Local atual');
+  const cat=selModal||'outros';
+  const val=parseFloat(document.getElementById('m-val').value)||0;
+  const note=document.getElementById('m-note').value.trim();
+  const addr=currentGPS?currentGPS.addr:'';
+  const coords=currentPos?currentPos.lat.toFixed(5)+', '+currentPos.lon.toFixed(5):'';
+  const p={place:name,cat,val,note,addr,coords,lat:currentPos?.lat,lon:currentPos?.lon,dist:(totalDist/1000).toFixed(2)};
+  points.push(p);
+  if(p.lat&&p.lon) addPinToMap(p.lat,p.lon,cat);
+  addToTimeline(p);
+  const grand=points.reduce((s,x)=>s+(x.val||0),0);
+  document.getElementById('total-badge').textContent=fmt(grand);
+  document.getElementById('tripkm').textContent=points.length+' ponto'+(points.length!==1?'s':'')+' · '+(totalDist/1000).toFixed(2)+' km';
+  saveToStorage(); closeModal();
+}
+function catFor(id){return CATS.find(c=>c.id===id)||CATS[5];}
+function addToTimeline(p){
+  const cat=catFor(p.cat);
+  const list=document.getElementById('tl-list');
+  const row=document.createElement('div'); row.className='tl-row';
+  row.innerHTML=buildTlRowHtml(p,cat);
+  list.appendChild(row);
+}
+function showScreen(s){
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('screen-'+s).classList.add('active');
+  const idx={mapa:0,timeline:1,gastos:2,historico:3}[s];
+  document.querySelectorAll('.ntab')[idx].classList.add('active');
+  if(s==='mapa'&&map) setTimeout(()=>map.invalidateSize(),50);
+  if(s==='gastos') renderGastos();
+  if(s==='historico') renderHistorico();
+}
+function renderGastos(){
+  const selCats=window._selCats;
+  const r=document.getElementById('filter-row'); r.innerHTML='';
+  const allOn=selCats.size===CATS.length;
+  const all=document.createElement('div');
+  all.className='fchip'+(allOn?' on':'');
+  all.textContent='Todos';
+  all.onclick=()=>{if(allOn)selCats.clear();else CATS.forEach(c=>selCats.add(c.id));renderGastos();};
+  r.appendChild(all);
+  CATS.forEach(c=>{
+    const ch=document.createElement('div');
+    ch.className='fchip'+(selCats.has(c.id)?' on':'');
+    ch.textContent=c.icon+' '+c.label;
+    ch.onclick=()=>{if(selCats.has(c.id))selCats.delete(c.id);else selCats.add(c.id);renderGastos();};
+    r.appendChild(ch);
+  });
+  const filtered=points.filter(p=>selCats.has(p.cat));
+  const grand=filtered.reduce((s,p)=>s+(p.val||0),0);
+  document.getElementById('grand-total').textContent=fmt(grand);
+  const catTotals={};
+  CATS.forEach(c=>{catTotals[c.id]={sum:0,count:0};});
+  filtered.forEach(p=>{catTotals[p.cat].sum+=(p.val||0);catTotals[p.cat].count++;});
+  const maxSum=Math.max(...Object.values(catTotals).map(x=>x.sum),1);
+  const cr=document.getElementById('cat-rows'); cr.innerHTML='';
+  CATS.forEach(c=>{
+    const ct=catTotals[c.id];
+    if(!selCats.has(c.id)||ct.count===0) return;
+    const pct=Math.round(ct.sum/maxSum*100);
+    const row=document.createElement('div'); row.className='cat-row';
+    row.innerHTML=`<div class="cat-icon" style="background:${c.bg};">${c.icon}</div>
+      <div class="cat-info"><div class="cat-name">${c.label} <span class="cat-count">${ct.count} parada${ct.count!==1?'s':''}</span></div>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${c.color};"></div></div></div>
+      <div class="cat-val">${fmt(ct.sum)}</div>`;
+    cr.appendChild(row);
+  });
+  const dl=document.getElementById('detail-list'); dl.innerHTML='';
+  if(!filtered.length){dl.innerHTML='<div style="text-align:center;padding:32px 0;font-size:13px;color:#aaa;">Nenhum ponto selecionado.</div>';return;}
+  filtered.slice().reverse().forEach(p=>{
+    const cat=catFor(p.cat);
+    const card=document.createElement('div'); card.className='detail-card';
+    card.innerHTML=`<div class="dc-top"><div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:${cat.bg};display:flex;align-items:center;justify-content:center;font-size:14px;">${cat.icon}</div>
+      <div class="dc-place">${p.place}</div></div>
+      ${p.val?`<div class="dc-val">${fmt(p.val)}</div>`:''}
+    </div>
+    <div class="dc-meta">${cat.label} · ${p.dist} km</div>
+    ${p.note?`<div class="dc-note">${p.note}</div>`:''}`;
+    dl.appendChild(card);
+  });
+}
+function renderHistorico(){
+  const wrap=document.getElementById('hist-wrap');
+  wrap.innerHTML='<div id="hist-label" style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">Viagens salvas</div><div id="hist-list"></div>';
+  const list=document.getElementById('hist-list');
+  const trips=getSavedTrips();
+  if(!trips.length){list.innerHTML='<div class="hist-empty">Nenhuma viagem salva ainda.</div>';return;}
+  trips.forEach(trip=>{
+    const d=new Date(trip.date);
+    const dateStr=d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const card=document.createElement('div'); card.className='hist-card';
+    const cats=[...new Set(trip.points.map(p=>p.cat))];
+    const badges=cats.map(id=>{const c=catFor(id);return`<span class="hist-badge">${c.icon} ${c.label}</span>`;}).join('');
+    card.innerHTML=`<div class="hist-name">Viagem — ${dateStr}</div>
+      <div class="hist-meta">${trip.points.length} ponto${trip.points.length!==1?'s':''} · ${trip.km} km · ${fmt(trip.total)}</div>
+      <div class="hist-badges">${badges}</div>`;
+    card.onclick=()=>showTripDetail(trip,wrap);
+    list.appendChild(card);
+  });
+}
+function showTripDetail(trip,wrap){
+  const d=new Date(trip.date);
+  const dateStr=d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  wrap.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+    <button class="back-btn" onclick="renderHistorico()">← Voltar</button>
+    <span style="font-size:14px;font-weight:600;color:#111;">Viagem — ${dateStr}</span></div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;">
+      <div style="flex:1;background:#f7f7f7;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:11px;color:#888;">Distância</div><div style="font-size:18px;font-weight:700;color:#111;">${trip.km} km</div></div>
+      <div style="flex:1;background:#f7f7f7;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:11px;color:#888;">Total gasto</div><div style="font-size:18px;font-weight:700;color:#111;">${fmt(trip.total)}</div></div>
+      <div style="flex:1;background:#f7f7f7;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:11px;color:#888;">Pontos</div><div style="font-size:18px;font-weight:700;color:#111;">${trip.points.length}</div></div>
+    </div>
+    <div id="hist-list"></div>`;
+  const list=document.getElementById('hist-list');
+  if(!trip.points.length){list.innerHTML='<div class="hist-empty">Nenhum ponto nesta viagem.</div>';return;}
+  trip.points.forEach(p=>{
+    const cat=catFor(p.cat);
+    const card=document.createElement('div'); card.className='detail-card';
+    card.innerHTML=`<div class="dc-top"><div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:${cat.bg};display:flex;align-items:center;justify-content:center;font-size:14px;">${cat.icon}</div>
+      <div class="dc-place">${p.place}</div></div>
+      ${p.val?`<div class="dc-val">${fmt(p.val)}</div>`:''}
+    </div>
+    <div class="dc-meta">${cat.label} · ${p.dist} km</div>
+    ${p.note?`<div class="dc-note">${p.note}</div>`:''}`;
+    list.appendChild(card);
+  });
+}
+document.addEventListener('visibilitychange',()=>{
+  const w=document.getElementById('bg-warning');
+  if(document.hidden&&!ended&&watching) w.style.display='block';
+  else w.style.display='none';
+});
+generateManifest();
+registerSW();
+const resumed=loadFromStorage();
+if(navigator.geolocation){
+  watchId=navigator.geolocation.watchPosition(onGPSSuccess,onGPSError,{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+}else{
+  document.getElementById('statustext').textContent='GPS não suportado.';
+}
+if(resumed){
+  const grand=points.reduce((s,x)=>s+(x.val||0),0);
+  document.getElementById('total-badge').textContent=fmt(grand);
+  document.getElementById('tripkm').textContent=points.length+' ponto'+(points.length!==1?'s':'')+' · '+(totalDist/1000).toFixed(2)+' km';
+}
+renderGastos();
+</script>
+</body>
+</html>

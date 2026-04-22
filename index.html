@@ -275,6 +275,35 @@ self.addEventListener('fetch',e=>{
   navigator.serviceWorker.register(url).catch(()=>{});
 }
 
+const SUPABASE_URL='https://xljpxunqyzegqjbkuxex.supabase.co';
+const SUPABASE_KEY='sb_publishable_DzIzuxhxwMUtfx26vrg4ZQ_CyThgQe9';
+
+async function salvarSupabase(viagem){
+  try{
+    const payload={
+      usuario:viagem.usuario||'anonimo',
+      perfil:viagem.profile||'comum',
+      km:viagem.km,
+      total:viagem.total||0,
+      cpkm:viagem.cpkm||null,
+      pontos:viagem.points||[],
+      rota:viagem.routeCoords||[],
+      uber_total:viagem.uberTotal||0,
+      consumo:viagem.consumption||null
+    };
+    await fetch(SUPABASE_URL+'/rest/v1/viagens',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_KEY,
+        'Authorization':'Bearer '+SUPABASE_KEY,
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify(payload)
+    });
+  }catch(e){console.log('Supabase erro:',e);}
+}
+
 function saveToStorage(){
   const state={points,routeCoords,totalDist,tripStart,ended};
   try{localStorage.setItem('tl_current',JSON.stringify(state));}catch(e){}
@@ -292,6 +321,7 @@ function loadFromStorage(){
 }
 function getSavedTrips(){try{return JSON.parse(localStorage.getItem('tl_trips')||'[]');}catch(e){return[];}}
 function saveTripToHistory(trip){
+  salvarSupabase(trip);
   const trips=getSavedTrips(); trips.unshift(trip);
   try{localStorage.setItem('tl_trips',JSON.stringify(trips));}catch(e){}
 }

@@ -281,26 +281,28 @@ const SUPABASE_KEY='sb_publishable_DzIzuxhxwMUtfx26vrg4ZQ_CyThgQe9';
 async function salvarSupabase(viagem){
   try{
     const payload={
-      usuario:viagem.usuario||'anonimo',
+      usuario:'anonimo',
       perfil:viagem.profile||'comum',
-      km:viagem.km,
-      total:viagem.total||0,
-      cpkm:viagem.cpkm||null,
-      pontos:viagem.points||[],
-      rota:viagem.routeCoords||[],
-      uber_total:viagem.uberTotal||0,
-      consumo:viagem.consumption||null
+      km:String(viagem.km||'0'),
+      total:Number(viagem.total)||0,
+      cpkm:String(viagem.cpkm||''),
+      pontos:JSON.parse(JSON.stringify(viagem.points||[])),
+      rota:JSON.parse(JSON.stringify(viagem.routeCoords||[])),
+      uber_total:Number(viagem.uberTotal)||0,
+      consumo:String(viagem.consumption||'')
     };
-    await fetch(SUPABASE_URL+'/rest/v1/viagens',{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/viagens',{
       method:'POST',
       headers:{
         'Content-Type':'application/json',
         'apikey':SUPABASE_KEY,
         'Authorization':'Bearer '+SUPABASE_KEY,
-        'Prefer':'return=minimal'
+        'Prefer':'return=representation'
       },
       body:JSON.stringify(payload)
     });
+    const txt=await res.text();
+    console.log('Supabase:',res.status,txt);
   }catch(e){console.log('Supabase erro:',e);}
 }
 
